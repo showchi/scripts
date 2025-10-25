@@ -176,7 +176,14 @@ config.outbounds.map(outbound => {
       }
       const tags = getTags(proxies, tagRegex)
       log(`🕳 ${outbound.tag} 匹配 ${outboundRegex}, 插入 ${tags.length} 个 🏷 匹配 ${tagRegex} 的节点`)
-      outbound.outbounds.push(...tags)
+      // 仅插入未存在的 tag，避免重复
+      const existing = new Set(outbound.outbounds)
+      for (const t of tags) {
+        if (!existing.has(t)) {
+          outbound.outbounds.push(t)
+          existing.add(t)
+        }
+      }
     }
   })
 })
@@ -201,7 +208,10 @@ config.outbounds.map(outbound => {
           compatible = true
         }
         log(`🕳 ${outbound.tag} 的 outbounds 为空, 自动插入 COMPATIBLE(direct)`)
-        outbound.outbounds.push(compatible_outbound.tag)
+        // 仅插入一次 COMPATIBLE
+        if (!outbound.outbounds.includes(compatible_outbound.tag)) {
+          outbound.outbounds.push(compatible_outbound.tag)
+        }
       }
     }
   })
@@ -218,21 +228,31 @@ function log(v) {
   console.log(`[📦 sing-box 模板脚本] ${v}`)
 }
 // 解析支持 /pattern/flags 的正则字面量，也支持直接写 pattern（无 flags）
+// 对 outboundPattern：如果不是正则字面量，则视为精确标签，做转义并添加 ^$，避免子串匹配导致重复插入
 function parsePattern(pattern) {
-  if (!pattern) return /.*/
+  if (!pattern) return null
   if (pattern.startsWith('/') && pattern.lastIndexOf('/') > 0) {
     const lastSlash = pattern.lastIndexOf('/')
     const body = pattern.slice(1, lastSlash)
     const flags = pattern.slice(lastSlash + 1)
     return new RegExp(body, flags)
   }
-  return new RegExp(pattern)
+  return null
 }
 function createTagRegExp(tagPattern) {
-  return parsePattern(tagPattern)
+  if (!tagPattern) return /.*/
+  const r = parsePattern(tagPattern)
+  if (r) return r
+  // 非字面量，按用户给的字符串构造 RegExp（保持灵活性）
+  return new RegExp(tagPattern)
 }
 function createOutboundRegExp(outboundPattern) {
-  return parsePattern(outboundPattern)
+  if (!outboundPattern) return /.*/
+  const r = parsePattern(outboundPattern)
+  if (r) return r
+  // 非字面量视为精确标签，escape 并加 ^$，防止 'ALL' 匹配 'ALL-Auto'
+  const esc = String(outboundPattern).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^${esc}$`)
 }
 
 log(`🔚 结束`)
