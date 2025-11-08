@@ -15,6 +15,14 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+  # --- Watchtower 自动更新守护 ---
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # 访问 Docker API
+    command: --cleanup --schedule "0 */4 * * *"   # 每 4 小时检测更新并清理旧镜像
 
 # --- 持久化卷定义 ---
 volumes:
