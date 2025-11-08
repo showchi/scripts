@@ -1,0 +1,7 @@
+services:
+  sing-box:
+    image: dockerhub16/sing-box-subscribe:latest
+    container_name: sing-box
+    ports:
+      - "5001:5000"
+    restart: always
